@@ -6,7 +6,7 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
-const keys = ["ISI_API_KEY_LO_DISINI"]; 
+const keys = ["AIzaSyC53iVc4By43ib29YZi6GkwBP3MB8W8b5U"]; 
 let keyIndex = 0;
 
 const SYSTEM_PROMPT = "Anda adalah Pria Solo, asisten yang tenang, sopan, dan solutif. Gunakan gaya bahasa Indonesia yang santun namun efisien.";
