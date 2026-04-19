@@ -1,154 +1,144 @@
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-const axios = require('axios');
+const cloudscraper = require('cloudscraper');
+const crypto = require('crypto');
 
-// Lightweight local .env loader (no external dependency).
-(function loadLocalEnv() {
-    const dotenvPath = path.join(__dirname, '../.env');
-    if (!fs.existsSync(dotenvPath)) return;
+class Perplexity {
+  constructor() {
+    this.baseUrl = 'https://www.perplexity.ai';
+    this.headers = {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+      'Accept': 'text/event-stream',
+      'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Content-Type': 'application/json',
+      'Origin': this.baseUrl,
+      'Referer': this.baseUrl + '/',
+      'sec-ch-ua': '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Linux"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin'
+    };
+    this.cookies = {
+      'pplx.visitor-id': crypto.randomUUID(),
+      'pplx.session-id': crypto.randomUUID(),
+      'pplx.edge-vid': crypto.randomUUID(),
+      'pplx.edge-sid': crypto.randomUUID()
+    };
+  }
 
-    const content = fs.readFileSync(dotenvPath, 'utf8');
-    for (const rawLine of content.split(/\r?\n/)) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith('#')) continue;
+  generateUUID() {
+    return crypto.randomUUID();
+  }
 
-        const sep = line.indexOf('=');
-        if (sep <= 0) continue;
+  getCookieString() {
+    return Object.entries(this.cookies).map(([k, v]) => `${k}=${v}`).join('; ');
+  }
 
-        const key = line.slice(0, sep).trim();
-        let value = line.slice(sep + 1).trim();
+  async ask(query) {
+    const frontend_uuid = this.generateUUID();
+    const read_write_token = this.generateUUID();
+    const last_backend_uuid = this.generateUUID();
 
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
+    const payload = {
+      params: {
+        last_backend_uuid: last_backend_uuid,
+        read_write_token: read_write_token,
+        attachments: [],
+        language: 'id-ID',
+        timezone: 'Asia/Jakarta',
+        search_focus: 'internet',
+        sources: ['web'],
+        frontend_uuid: frontend_uuid,
+        mode: 'copilot',
+        model_preference: 'turbo',
+        is_related_query: false,
+        is_sponsored: false,
+        prompt_source: 'user',
+        query_source: 'followup',
+        is_incognito: false,
+        local_search_enabled: false,
+        use_schematized_api: true,
+        send_back_text_in_streaming_api: false,
+        supported_block_use_cases: [
+          'answer_modes', 'media_items', 'knowledge_cards', 'inline_entity_cards',
+          'place_widgets', 'finance_widgets', 'prediction_market_widgets',
+          'sports_widgets', 'flight_status_widgets', 'news_widgets',
+          'shopping_widgets', 'jobs_widgets', 'search_result_widgets',
+          'inline_images', 'inline_assets', 'placeholder_cards', 'diff_blocks',
+          'inline_knowledge_cards', 'entity_group_v2', 'refinement_filters',
+          'canvas_mode', 'maps_preview', 'answer_tabs', 'price_comparison_widgets',
+          'preserve_latex', 'generic_onboarding_widgets', 'in_context_suggestions',
+          'pending_followups', 'inline_claims', 'unified_assets'
+        ],
+        client_coordinates: null,
+        mentions: [],
+        skip_search_enabled: true,
+        is_nav_suggestions_disabled: false,
+        followup_source: 'link',
+        source: 'default',
+        always_search_override: false,
+        override_no_search: false,
+        should_ask_for_mcp_tool_confirmation: true,
+        force_enable_browser_agent: false,
+        supported_features: ['browser_agent_permission_banner_v1.1'],
+        version: '2.18'
+      },
+      query_str: query
+    };
 
-        if (process.env[key] === undefined) {
-            process.env[key] = value;
-        }
+    const response = await cloudscraper({
+      method: 'POST',
+      url: `${this.baseUrl}/rest/sse/perplexity_ask`,
+      headers: {
+        ...this.headers,
+        'Cookie': this.getCookieString(),
+        'x-request-id': this.generateUUID(),
+        'x-perplexity-request-reason': 'perplexity-query-state-provider'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const lines = response.split('\n');
+    let finalMessage = null;
+    
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].startsWith('data: ')) {
+        try {
+          const data = JSON.parse(lines[i].substring(5));
+          if (data.text && data.final) {
+            finalMessage = data;
+            break;
+          }
+        } catch {}
+      }
     }
-})();
 
-const app = express();
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
-
-const GEMINI_KEY = process.env.GEMINI_KEY || process.env.GOOGLE_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-
-const SYSTEM_PROMPT =
-    'Anda adalah Pria Solo, asisten yang tenang, sopan, dan solutif. Gunakan gaya bahasa Indonesia yang santun.';
-
-function mapGeminiError(error) {
-    const status = error.response?.status || 500;
-    const data = error.response?.data;
-    const gError = data?.error;
+    if (finalMessage && finalMessage.text) {
+      try {
+        const parsed = JSON.parse(finalMessage.text);
+        for (const item of parsed) {
+          if (item.step_type === 'FINAL' && item.content && item.content.answer) {
+            const answerData = JSON.parse(item.content.answer);
+            return {
+              success: true,
+              query: query,
+              answer: answerData.answer
+            };
+          }
+        }
+      } catch {}
+    }
 
     return {
-        status,
-        code: gError?.status || `HTTP_${status}`,
-        message:
-            gError?.message ||
-            (typeof data === 'string' ? data.slice(0, 300) : null) ||
-            error.message ||
-            'Terjadi kesalahan pada server ketika menghubungi Gemini API.',
-        details: gError?.details || (typeof data === 'object' ? data : null),
+      success: false,
+      query: query,
+      answer: null
     };
+  }
 }
 
-app.get('/api/health', async (_req, res) => {
-    const checks = {
-        envKeyPresent: Boolean(GEMINI_KEY),
-        model: GEMINI_MODEL,
-        serverTimeUtc: new Date().toISOString(),
-    };
-
-    if (!GEMINI_KEY) {
-        return res.status(500).json({
-            ok: false,
-            checks,
-            error: 'Environment variable GEMINI_KEY / GOOGLE_API_KEY tidak ditemukan di runtime process.',
-        });
-    }
-
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}?key=${GEMINI_KEY}`;
-        const ping = await axios.get(url, { timeout: 10000 });
-        return res.json({
-            ok: true,
-            checks,
-            modelInfo: {
-                name: ping.data?.name,
-                displayName: ping.data?.displayName,
-                description: ping.data?.description,
-            },
-        });
-    } catch (error) {
-        const mapped = mapGeminiError(error);
-        return res.status(mapped.status).json({
-            ok: false,
-            checks,
-            error: mapped,
-        });
-    }
-});
-
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { message } = req.body || {};
-
-        if (!message || typeof message !== 'string') {
-            return res.status(400).json({ error: 'Payload tidak valid. Field "message" wajib berupa string.' });
-        }
-
-        if (!GEMINI_KEY) {
-            return res.status(500).json({
-                error:
-                    'API key tidak tersedia pada runtime. Pastikan GEMINI_KEY (atau GOOGLE_API_KEY) tersedia di process.env.',
-            });
-        }
-
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
-        const response = await axios.post(
-            url,
-            {
-                systemInstruction: {
-                    parts: [{ text: SYSTEM_PROMPT }],
-                },
-                contents: [{ role: 'user', parts: [{ text: message }] }],
-            },
-            { timeout: 30000 }
-        );
-
-        const aiReply = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!aiReply) {
-            return res.status(502).json({
-                error: 'Gemini mengembalikan response tanpa konten teks.',
-                rawFinishReason: response.data?.candidates?.[0]?.finishReason || null,
-            });
-        }
-
-        res.json({ reply: aiReply });
-    } catch (error) {
-        const mapped = mapGeminiError(error);
-        console.error('Gemini API error:', JSON.stringify(mapped, null, 2));
-
-        res.status(mapped.status).json({
-            error: mapped.message,
-            code: mapped.code,
-            details: mapped.details,
-        });
-    }
-});
-
-if (require.main === module) {
-    const PORT = Number(process.env.PORT) || 3000;
-    app.listen(PORT, () => {
-        console.log(`Server jalan di http://localhost:${PORT}`);
-        console.log(`Mode diagnostics: GET http://localhost:${PORT}/api/health`);
-    });
-}
-
-module.exports = app;
+(async () => {
+  const perplexity = new Perplexity();
+  const result = await perplexity.ask('apakah mulyono turun ke selokan?');
+  console.log(result.answer);
+})();
