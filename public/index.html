@@ -3,129 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RHMT LAB | AI</title>
+    <title>RHMT LAB | Pria Solo AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { 
-            background-color: #000000; 
-            color: #e5e5e5; 
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        .messages-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            padding-bottom: 120px; /* Space for input */
-        }
-        .bubble {
-            max-width: 85%;
-            padding: 14px 18px;
-            border-radius: 20px;
-            margin-bottom: 1.5rem;
-            font-size: 0.95rem;
-            line-height: 1.6;
-        }
-        .bubble-user {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            align-self: flex-end;
-            margin-left: auto;
-            border-bottom-right-radius: 4px;
-        }
-        .bubble-ai {
-            background-color: transparent;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-            border: 1px solid #262626;
-        }
-        .input-sticky {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: linear-gradient(to top, #000 80%, transparent);
-            padding: 20px 15px 30px;
-        }
-        .input-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #121212;
-            border: 1px solid #2a2a2a;
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            padding: 6px 15px;
-        }
-        input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            flex: 1;
-            padding: 12px;
-            font-size: 0.95rem;
-        }
-        .send-btn {
-            background: #ffffff;
-            color: #000;
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s ease;
-        }
-        .send-btn:active { transform: scale(0.9); }
-        ::-webkit-scrollbar { width: 0px; }
+        body { background-color: #000; color: #e5e5e5; font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; margin: 0; }
+        .chat-area { flex: 1; overflow-y: auto; padding: 1.5rem; scroll-behavior: smooth; }
+        .bubble { max-width: 85%; padding: 12px 16px; border-radius: 18px; margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.5; }
+        .user { background: #1a1a1a; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 4px; }
+        .ai { background: transparent; align-self: flex-start; border: 1px solid #262626; border-bottom-left-radius: 4px; }
+        .input-bar { padding: 1.5rem; background: linear-gradient(to top, #000 80%, transparent); }
+        .input-container { max-width: 800px; margin: 0 auto; background: #121212; border: 1px solid #2a2a2a; border-radius: 25px; display: flex; padding: 5px 15px; align-items: center; }
+        input { background: transparent; border: none; outline: none; color: #fff; flex: 1; padding: 10px; }
+        .btn-send { background: #fff; color: #000; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        ::-webkit-scrollbar { width: 0; }
     </style>
 </head>
 <body>
-
-    <header class="p-4 border-b border-zinc-900 bg-black/50 backdrop-blur-md sticky top-0 z-10 text-center">
-        <h1 class="text-xs font-bold tracking-[0.2em] text-zinc-500">RHMT LAB EXPERIMENT</h1>
-    </header>
-
-    <div id="chatBox" class="messages-area flex flex-col">
-        <div class="bubble bubble-ai">
-            Halo. Saya siap membantu eksperimen Anda. Ada yang perlu didiskusikan?
-        </div>
+    <header class="p-4 border-b border-zinc-900 text-center text-[10px] tracking-[0.3em] text-zinc-500 font-bold">RHMT LAB EXPERIMENT</header>
+    <div id="chatBox" class="chat-area flex flex-col">
+        <div class="bubble ai">Halo. Saya siap membantu.</div>
     </div>
-
-    <div class="input-sticky">
+    <div class="input-bar">
         <div class="input-container">
             <input type="text" id="userInput" placeholder="Tanya Pria Solo..." autocomplete="off">
-            <button onclick="send()" class="send-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                </svg>
-            </button>
+            <button onclick="send()" class="btn-send">↑</button>
         </div>
-        <p class="text-[9px] text-center mt-3 text-zinc-700 uppercase tracking-widest">Powered by Gemini 2.5 Flash</p>
     </div>
-
     <script>
         const chatBox = document.getElementById('chatBox');
         const userInput = document.getElementById('userInput');
-
-        userInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") send();
-        });
-
         async function send() {
             const msg = userInput.value.trim();
             if(!msg) return;
-
-            appendMessage('user', msg);
+            chatBox.innerHTML += `<div class="bubble user">${msg}</div>`;
             userInput.value = '';
-
-            const loadingId = "id-" + Date.now();
-            appendMessage('ai', 'Sedang mengetik...', loadingId);
-
+            const loadId = "id-" + Date.now();
+            chatBox.innerHTML += `<div id="${loadId}" class="bubble ai">...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
@@ -133,21 +48,11 @@
                     body: JSON.stringify({ message: msg })
                 });
                 const data = await res.json();
-                document.getElementById(loadingId).innerText = data.reply || data.error;
-            } catch (e) {
-                document.getElementById(loadingId).innerText = "Koneksi terputus.";
-            }
+                document.getElementById(loadId).innerText = data.reply || data.error;
+            } catch (e) { document.getElementById(loadId).innerText = "Server Error."; }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
-
-        function appendMessage(role, text, id = null) {
-            const div = document.createElement('div');
-            div.className = `bubble ${role === 'user' ? 'bubble-user' : 'bubble-ai'}`;
-            if(id) div.id = id;
-            div.innerText = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTo(0, chatBox.scrollHeight);
-        }
+        userInput.addEventListener("keypress", (e) => { if(e.key === "Enter") send(); });
     </script>
 </body>
 </html>
