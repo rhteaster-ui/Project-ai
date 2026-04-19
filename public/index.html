@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RHMT LAB | AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #000000; 
+            color: #e5e5e5; 
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-col: column;
+        }
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem 1rem;
+            scroll-behavior: smooth;
+        }
+        /* Bubble Style */
+        .bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+        .bubble-user {
+            background-color: #262626;
+            color: #fff;
+            align-self: flex-end;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .bubble-ai {
+            background-color: transparent;
+            color: #e5e5e5;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid #262626;
+        }
+        .input-wrapper {
+            padding: 1.5rem;
+            background: linear-gradient(to top, #000 70%, transparent);
+        }
+        .input-box {
+            background-color: #171717;
+            border: 1px solid #333;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            transition: border 0.3s;
+        }
+        .input-box:focus-within {
+            border-color: #555;
+        }
+        input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            flex: 1;
+            padding: 10px;
+        }
+        /* Hide scrollbar */
+        ::-webkit-scrollbar { width: 0px; }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <header class="p-4 text-center border-b border-zinc-900">
+            <h1 class="text-sm font-semibold tracking-widest text-zinc-400 uppercase">RHMT LAB EXPERIMENT</h1>
+        </header>
+
+        <div id="chatBox" class="messages-area flex flex-col">
+            <div class="bubble bubble-ai shadow-sm">
+                Halo. Ada yang bisa saya bantu hari ini?
+            </div>
+        </div>
+
+        <div class="input-wrapper">
+            <div class="input-box">
+                <input type="text" id="userInput" placeholder="Ketik pesan..." autocomplete="off">
+                <button onclick="send()" class="ml-2 bg-white text-black h-8 w-8 rounded-full flex items-center justify-center hover:bg-zinc-200 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                    </svg>
+                </button>
+            </div>
+            <p class="text-[10px] text-center mt-3 text-zinc-600">Gemini 2.5 Flash • Eksperimen Pria Solo</p>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") send();
+        });
+
+        async function send() {
+            const msg = userInput.value.trim();
+            if(!msg) return;
+
+            // User Message
+            appendMessage('user', msg);
+            userInput.value = '';
+
+            // AI Thinking (Typing effect placeholder)
+            const loadingId = Date.now();
+            appendMessage('ai', '...', loadingId);
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                
+                // Update loading bubble with real response
+                document.getElementById(loadingId).innerText = data.reply;
+            } catch (e) {
+                document.getElementById(loadingId).innerText = "Maaf, sistem sedang sibuk.";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function appendMessage(role, text, id = null) {
+            const div = document.createElement('div');
+            div.className = `bubble ${role === 'user' ? 'bubble-user' : 'bubble-ai'}`;
+            if(id) div.id = id;
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
